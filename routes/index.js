@@ -1,44 +1,37 @@
 var express = require('express');
 var router = express.Router();
-
-
-// "Database". Names of places, and whether the user has visited it or not.
-
-var places = [
-{id: "1", name: "Rome", visited: true},
-{id: "2", name: "New York", visited: false},
-{id: "3", name: "Tokyo", visited: false}
-];
-var counter = places.length;
+var ObjectId = require('mongodb').ObjectID;
 
 
 /* GET home page. */
-router.get('/', function(req, res) {
-  res.render('index', { title: 'Travel Wish List', places : places });
+router.get('/', function(req, res, next){
+    req.db.collection('places').find().toArray(function(err, docs){
+        if (err){
+            return next(err);
+        }
+        res.render('index', {title: 'Travel Wish List', places: docs});
+    });
 });
-
 
 /* GET all items home page. */
 router.get('/all', function(req, res) {
-  res.json(places);
+    req.db.collection('places').find().toArray(function(err, docs){
+        if (err){
+            return next(err);
+        }
+        res.json(docs);
+    });
 });
 
-
 /* POST - add a new location */
+// I wanted to allow the user to add a place more than once in case they wanted to remember to visit again
 router.post('/add', function(req, res) {
 
-  var name = req.body.name;
-  var place = { 'id': ++counter + "" , 'name': name, 'visited': false };
-
-  places.push(place);
-
-  console.log('After POST, the places list is');
-  console.log(places);
-
-  res.status(201);      // Created
-  res.json(place);      // Send new object data back as JSON, if needed.
-
-  // TODO may want to check if place already in list and don't add.
+    var name = req.body.name;
+    var place = {'name': name, 'visited': false};
+    req.db.collection('places').insertOne({'name':name, 'visited':false});
+    res.status(201);      // Created
+    res.json(place);      // Send new object data back as JSON, if needed.
 
 });
 
@@ -46,47 +39,26 @@ router.post('/add', function(req, res) {
 /* PUT - update whether a place has been visited or not */
 router.put('/update', function(req, res){
 
-  var id = req.body.id;
-  var visited = req.body.visited == "true";  // all the body parameters are strings
+    var id = req.body.id;
+    var visited = req.body.visited == "visited";
 
-  for (var i = 0 ; i < places.length ; i++) {
-    var place = places[i];
-    if (place.id == id) {
-      place.visited = visited;
-      places[i] = place;
-    }
-  }
+    req.db.collection('places').update({"_id":ObjectId(id)}, {$set:{"visited":visited}});
 
-  console.log('After PUT, the places list is');
-  console.log(places);
-
-  res.json(place);
+    res.status(200);
+    res.end();
 
 });
 
-
+/* delete a location */
 router.delete('/delete', function(req, res){
 
   var place_id = req.body.id;
-  console.log(place_id);
 
-  for (var i = 0 ; i < places.length ; i++) {
-    var place = places[i];
-    if (place.id == place_id) {
-      places.splice(i, 1);  //Delete the element at this position
-      res.json(place);
-      break;
-    }
-  }
-
-  console.log('After DELETE, the places list is');
-  console.log(places);
+  req.db.collection('places').remove({'_id':ObjectId(place_id)});
 
   res.status(200);
   res.end();
 
 });
-
-
 
 module.exports = router;
